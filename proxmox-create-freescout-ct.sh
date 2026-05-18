@@ -251,6 +251,14 @@ for i in $(seq 1 24); do
     fi
 done
 
+# ── curl + ca-certificates vorinstallieren ─────────────────────────────────
+info "Installiere curl im Container (Debian-Minimal hat kein curl)..."
+if pct exec "$CT_ID" -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates" >/dev/null 2>&1; then
+    log "curl installiert."
+else
+    warn "curl-Install fehlgeschlagen — manuell im LXC nachholen: apt-get install -y curl"
+fi
+
 # ── Fertig ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════╗${NC}"
