@@ -305,9 +305,11 @@ chown -R www-data:www-data /var/www/freescout
 
 # Composer als www-data; HOME=/tmp damit composer-Cache schreibbar ist.
 # --ignore-platform-reqs: dist-Branch composer.lock wurde gegen ältere PHP-Version gebaut.
+# KEIN --optimize-autoloader: rap2hpoutre/laravel-log-viewer hat src/controllers → src/
+# umstrukturiert, ClassMap-Gen scheitert dann. FreeScout-Doku empfiehlt's auch nicht.
 info "  composer install (kann dauern)..."
 if ! runuser -u www-data -- env HOME=/tmp COMPOSER_HOME=/tmp/.composer-www \
-    composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs 2>&1 | tail -30; then
+    composer install --no-dev --no-interaction --ignore-platform-reqs 2>&1 | tail -30; then
     err "composer install fehlgeschlagen"
 fi
 
