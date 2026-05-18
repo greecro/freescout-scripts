@@ -299,21 +299,28 @@ cd /var/www
 git clone -b dist https://github.com/freescout-help-desk/freescout.git freescout >/dev/null 2>&1
 cd /var/www/freescout
 
-# Composer-Deps (als root — Files sind noch root-owned, chown -R weiter unten)
-# --ignore-platform-reqs: FreeScout's dist-Branch composer.lock wurde gegen ältere PHP-Version
-# gebaut, Composer 2.9.x ist strict. FreeScout selbst läuft offiziell auf PHP 7.3–8.3.
-COMPOSER_ALLOW_SUPERUSER=1 \
-    composer install --no-dev --optimize-autoloader --no-interaction --no-plugins --ignore-platform-reqs 2>&1 | tail -30
-# storage-symlink
-cp .env.example .env
-# .env vorbefüllen — KEIN DB-Block, KEIN Mail-Block
-sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
-sed -i "s|^APP_TIMEZONE=.*|APP_TIMEZONE=${APP_TIMEZONE}|" .env
-sed -i "s|^APP_LOCALE=.*|APP_LOCALE=${APP_LOCALE}|" .env || echo "APP_LOCALE=${APP_LOCALE}" >> .env
-# APP_KEY generieren
-php artisan key:generate --force >/dev/null
-
+# Ownership VOR composer setzen — sonst deaktiviert Composer alle Plugins
+# (Auto-Disable als root, was FreeScout-Post-Install-Hooks bricht).
 chown -R www-data:www-data /var/www/freescout
+
+# Composer als www-data; HOME=/tmp damit composer-Cache schreibbar ist.
+# --ignore-platform-reqs: dist-Branch composer.lock wurde gegen ältere PHP-Version gebaut.
+info "  composer install (kann dauern)..."
+if ! runuser -u www-data -- env HOME=/tmp COMPOSER_HOME=/tmp/.composer-www \
+    composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs 2>&1 | tail -30; then
+    err "composer install fehlgeschlagen"
+fi
+
+# .env vorbefüllen — KEIN DB-Block, KEIN Mail-Block
+cp .env.example .env
+sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
+grep -q "^APP_TIMEZONE=" .env && sed -i "s|^APP_TIMEZONE=.*|APP_TIMEZONE=${APP_TIMEZONE}|" .env || echo "APP_TIMEZONE=${APP_TIMEZONE}" >> .env
+grep -q "^APP_LOCALE=" .env && sed -i "s|^APP_LOCALE=.*|APP_LOCALE=${APP_LOCALE}|" .env || echo "APP_LOCALE=${APP_LOCALE}" >> .env
+chown www-data:www-data .env
+
+# APP_KEY als www-data
+runuser -u www-data -- env HOME=/tmp php artisan key:generate --force >/dev/null
+
 chmod -R 755 /var/www/freescout/storage /var/www/freescout/bootstrap/cache
 log "FreeScout-Files installiert."
 
