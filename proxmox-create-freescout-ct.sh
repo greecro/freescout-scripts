@@ -175,12 +175,28 @@ CT_BRIDGE=${CT_BRIDGE:-vmbr0}
 
 # ── SSH-Key ────────────────────────────────────────────────────────────────
 DEFAULT_SSH_KEY="/root/.ssh/authorized_keys"
-read -rp "SSH-Pubkey-Datei [Standard: ${DEFAULT_SSH_KEY}]: " SSH_KEY_FILE
+read -rp "SSH-Pubkey-Datei [Standard: ${DEFAULT_SSH_KEY}, '-' = ohne SSH-Key]: " SSH_KEY_FILE
 SSH_KEY_FILE=${SSH_KEY_FILE:-$DEFAULT_SSH_KEY}
-[[ ! -f "$SSH_KEY_FILE" ]] && err "SSH-Key-Datei nicht gefunden: ${SSH_KEY_FILE}"
+
+if [[ "$SSH_KEY_FILE" == "-" ]]; then
+    SSH_KEY_FILE=""
+    warn "Kein SSH-Key — Login nur via root-Passwort (siehe Ende)."
+elif [[ ! -f "$SSH_KEY_FILE" ]]; then
+    warn "SSH-Key-Datei nicht gefunden: ${SSH_KEY_FILE}"
+    read -rp "Anderen Pfad eingeben oder leer für 'ohne SSH-Key': " ALT_KEY
+    if [[ -z "$ALT_KEY" ]]; then
+        SSH_KEY_FILE=""
+        warn "Kein SSH-Key — Login nur via root-Passwort."
+    else
+        SSH_KEY_FILE="$ALT_KEY"
+        [[ ! -f "$SSH_KEY_FILE" ]] && err "Datei nicht gefunden: ${SSH_KEY_FILE}"
+    fi
+fi
 
 # ── Root-Passwort ──────────────────────────────────────────────────────────
-ROOT_PW=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 20)
+# head-first verhindert SIGPIPE auf tr (würde mit pipefail das Script killen)
+ROOT_PW=$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c 20)
+[[ ${#ROOT_PW} -lt 16 ]] && err "Konnte kein Passwort generieren (urandom?)."
 
 # ── Summary ────────────────────────────────────────────────────────────────
 echo ""
@@ -201,21 +217,23 @@ fi
 
 # ── Container erstellen ────────────────────────────────────────────────────
 info "Erstelle Container..."
-pct create "$CT_ID" "$TEMPLATE" \
-    --hostname "$CT_HOSTNAME" \
-    --cores "$CT_CORES" \
-    --memory "$CT_RAM" \
-    --swap "$CT_SWAP" \
-    --rootfs "${CT_STORAGE}:${CT_DISK}" \
-    --net0 "name=eth0,bridge=${CT_BRIDGE},ip=${CT_IP_CIDR},gw=${CT_GW}" \
-    --nameserver "$CT_DNS" \
-    --ssh-public-keys "$SSH_KEY_FILE" \
-    --password "$ROOT_PW" \
-    --features "nesting=1" \
-    --unprivileged 1 \
-    --onboot 1 \
-    --start 1 \
-    >/dev/null
+PCT_ARGS=(
+    --hostname "$CT_HOSTNAME"
+    --cores "$CT_CORES"
+    --memory "$CT_RAM"
+    --swap "$CT_SWAP"
+    --rootfs "${CT_STORAGE}:${CT_DISK}"
+    --net0 "name=eth0,bridge=${CT_BRIDGE},ip=${CT_IP_CIDR},gw=${CT_GW}"
+    --nameserver "$CT_DNS"
+    --password "$ROOT_PW"
+    --features "nesting=1"
+    --unprivileged 1
+    --onboot 1
+    --start 1
+)
+[[ -n "$SSH_KEY_FILE" ]] && PCT_ARGS+=( --ssh-public-keys "$SSH_KEY_FILE" )
+
+pct create "$CT_ID" "$TEMPLATE" "${PCT_ARGS[@]}" >/dev/null
 
 log "Container ${CT_ID} erstellt."
 

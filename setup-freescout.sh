@@ -95,7 +95,9 @@ read -rp "DB-Name [Standard: freescout]: " DB_NAME
 DB_NAME=${DB_NAME:-freescout}
 read -rp "DB-User [Standard: freescout]: " DB_USER
 DB_USER=${DB_USER:-freescout}
-DB_PASS=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)
+# head-first verhindert SIGPIPE auf tr (würde mit pipefail das Script killen)
+DB_PASS=$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c 24)
+[[ ${#DB_PASS} -lt 16 ]] && err "Konnte kein DB-Passwort generieren (urandom?)."
 info "DB-Passwort wird auto-generiert."
 
 echo ""
