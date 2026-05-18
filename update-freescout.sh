@@ -62,7 +62,7 @@ runuser -u www-data -- git pull --quiet
 # ── Composer ───────────────────────────────────────────────────────────────
 info "composer install..."
 COMPOSER_ALLOW_SUPERUSER=1 \
-    composer install --no-dev --optimize-autoloader --no-interaction --quiet
+    composer install --no-dev --optimize-autoloader --no-interaction --quiet --ignore-platform-reqs
 
 # ── Artisan Update-Hooks ───────────────────────────────────────────────────
 info "artisan freescout:after-app-update..."
@@ -78,7 +78,7 @@ if [[ -d Modules ]]; then
         [[ -f "${mod_dir}composer.json" ]] || continue
         echo "  → ${mod_dir}"
         (cd "$mod_dir" && COMPOSER_ALLOW_SUPERUSER=1 \
-            composer install --no-dev --no-interaction --quiet 2>/dev/null) || \
+            composer install --no-dev --no-interaction --quiet --ignore-platform-reqs 2>/dev/null) || \
             warn "  composer install fehlgeschlagen für ${mod_dir}"
     done
 fi

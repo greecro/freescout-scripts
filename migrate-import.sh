@@ -127,7 +127,7 @@ if [[ -d Modules ]]; then
         [[ -f "${mod_dir}composer.json" ]] || continue
         info "  → ${mod_dir}"
         (cd "$mod_dir" && COMPOSER_ALLOW_SUPERUSER=1 \
-            composer install --no-dev --no-interaction --quiet 2>/dev/null) || \
+            composer install --no-dev --no-interaction --quiet --ignore-platform-reqs 2>/dev/null) || \
             warn "  composer install fehlgeschlagen für ${mod_dir} — manuell prüfen."
     done
 fi

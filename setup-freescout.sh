@@ -300,8 +300,10 @@ git clone -b dist https://github.com/freescout-help-desk/freescout.git freescout
 cd /var/www/freescout
 
 # Composer-Deps (als root — Files sind noch root-owned, chown -R weiter unten)
+# --ignore-platform-reqs: FreeScout's dist-Branch composer.lock wurde gegen ältere PHP-Version
+# gebaut, Composer 2.9.x ist strict. FreeScout selbst läuft offiziell auf PHP 7.3–8.3.
 COMPOSER_ALLOW_SUPERUSER=1 \
-    composer install --no-dev --optimize-autoloader --no-interaction --quiet
+    composer install --no-dev --optimize-autoloader --no-interaction --no-plugins --ignore-platform-reqs 2>&1 | tail -30
 # storage-symlink
 cp .env.example .env
 # .env vorbefüllen — KEIN DB-Block, KEIN Mail-Block
