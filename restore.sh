@@ -79,7 +79,7 @@ read -rp "Wirklich fortfahren? [j/N]: " confirm
 [[ "$confirm" != "j" && "$confirm" != "J" ]] && err "Abgebrochen."
 
 # ── Maintenance ────────────────────────────────────────────────────────────
-sudo -u www-data php -d detect_unicode=0 "${INSTALL_DIR}/artisan" down --message="Restore läuft" || true
+runuser -u www-data -- php -d detect_unicode=0 "${INSTALL_DIR}/artisan" down --message="Restore läuft" || true
 supervisorctl stop freescout-worker:* 2>/dev/null || true
 
 # ── DB importieren ─────────────────────────────────────────────────────────
@@ -103,8 +103,8 @@ chmod -R 755 "${INSTALL_DIR}/storage"
 log "Storage importiert."
 
 # ── Cache + Hooks ──────────────────────────────────────────────────────────
-sudo -u www-data php "${INSTALL_DIR}/artisan" freescout:clear-cache || true
-sudo -u www-data php "${INSTALL_DIR}/artisan" up
+runuser -u www-data -- php "${INSTALL_DIR}/artisan" freescout:clear-cache || true
+runuser -u www-data -- php "${INSTALL_DIR}/artisan" up
 
 # ── Worker ─────────────────────────────────────────────────────────────────
 supervisorctl start freescout-worker:* || warn "Worker-Start fehlgeschlagen."

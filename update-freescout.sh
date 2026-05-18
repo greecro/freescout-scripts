@@ -39,7 +39,7 @@ ls -1dt /var/snapshots/freescout-* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/de
 
 # ── Maintenance-Mode ───────────────────────────────────────────────────────
 info "Maintenance-Mode aktivieren..."
-sudo -u www-data php artisan down --message="Update läuft" --retry=60 || true
+runuser -u www-data -- php artisan down --message="Update läuft" --retry=60 || true
 supervisorctl stop freescout-worker:* || true
 
 # Rollback-Trap
@@ -47,7 +47,7 @@ ROLLBACK_NEEDED=true
 rollback() {
     $ROLLBACK_NEEDED || return
     warn "Rollback einleiten..."
-    sudo -u www-data php artisan up || true
+    runuser -u www-data -- php artisan up || true
     warn "Snapshot zum Wiederherstellen: ${SNAP_DIR}"
     warn "Manuelles Rollback: bash restore.sh <snapshot-name>"
 }
@@ -55,21 +55,21 @@ trap rollback ERR
 
 # ── Git Pull ───────────────────────────────────────────────────────────────
 info "git pull (Branch: dist)..."
-sudo -u www-data git fetch --quiet
-sudo -u www-data git checkout dist --quiet 2>/dev/null || true
-sudo -u www-data git pull --quiet
+runuser -u www-data -- git fetch --quiet
+runuser -u www-data -- git checkout dist --quiet 2>/dev/null || true
+runuser -u www-data -- git pull --quiet
 
 # ── Composer ───────────────────────────────────────────────────────────────
 info "composer install..."
-sudo -u www-data -H COMPOSER_ALLOW_SUPERUSER=0 \
+COMPOSER_ALLOW_SUPERUSER=1 \
     composer install --no-dev --optimize-autoloader --no-interaction --quiet
 
 # ── Artisan Update-Hooks ───────────────────────────────────────────────────
 info "artisan freescout:after-app-update..."
-sudo -u www-data php artisan freescout:after-app-update 2>&1 | tail -5 || true
+runuser -u www-data -- php artisan freescout:after-app-update 2>&1 | tail -5 || true
 
 info "artisan migrate --force..."
-sudo -u www-data php artisan migrate --force 2>&1 | tail -5
+runuser -u www-data -- php artisan migrate --force 2>&1 | tail -5
 
 # ── Module: composer install pro Modul ─────────────────────────────────────
 if [[ -d Modules ]]; then
@@ -77,7 +77,7 @@ if [[ -d Modules ]]; then
     for mod_dir in Modules/*/; do
         [[ -f "${mod_dir}composer.json" ]] || continue
         echo "  → ${mod_dir}"
-        (cd "$mod_dir" && sudo -u www-data -H COMPOSER_ALLOW_SUPERUSER=0 \
+        (cd "$mod_dir" && COMPOSER_ALLOW_SUPERUSER=1 \
             composer install --no-dev --no-interaction --quiet 2>/dev/null) || \
             warn "  composer install fehlgeschlagen für ${mod_dir}"
     done
@@ -85,7 +85,7 @@ fi
 
 # ── Cache & Permissions ────────────────────────────────────────────────────
 info "Cache leeren..."
-sudo -u www-data php artisan freescout:clear-cache 2>&1 | tail -3 || true
+runuser -u www-data -- php artisan freescout:clear-cache 2>&1 | tail -3 || true
 chown -R www-data:www-data "$INSTALL_DIR"
 chmod -R 755 "${INSTALL_DIR}/storage" "${INSTALL_DIR}/bootstrap/cache"
 
@@ -98,7 +98,7 @@ supervisorctl start freescout-worker:* || warn "Worker konnte nicht gestartet we
 
 # ── Maintenance-Mode aus ───────────────────────────────────────────────────
 info "Maintenance-Mode aus..."
-sudo -u www-data php artisan up
+runuser -u www-data -- php artisan up
 
 ROLLBACK_NEEDED=false
 trap - ERR

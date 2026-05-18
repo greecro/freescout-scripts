@@ -126,7 +126,7 @@ if [[ -d Modules ]]; then
     for mod_dir in Modules/*/; do
         [[ -f "${mod_dir}composer.json" ]] || continue
         info "  → ${mod_dir}"
-        (cd "$mod_dir" && sudo -u www-data -H COMPOSER_ALLOW_SUPERUSER=0 \
+        (cd "$mod_dir" && COMPOSER_ALLOW_SUPERUSER=1 \
             composer install --no-dev --no-interaction --quiet 2>/dev/null) || \
             warn "  composer install fehlgeschlagen für ${mod_dir} — manuell prüfen."
     done
@@ -141,9 +141,9 @@ chmod -R 755 "${INSTALL_DIR}/storage" "${INSTALL_DIR}/bootstrap/cache"
 # ── Post-Update-Hooks ──────────────────────────────────────────────────────
 info "FreeScout-Hooks (clear-cache, after-app-update, migrate)..."
 cd "$INSTALL_DIR"
-sudo -u www-data php artisan freescout:clear-cache 2>&1 | tail -5 || true
-sudo -u www-data php artisan freescout:after-app-update 2>&1 | tail -5 || true
-sudo -u www-data php artisan migrate --force 2>&1 | tail -5 || true
+runuser -u www-data -- php artisan freescout:clear-cache 2>&1 | tail -5 || true
+runuser -u www-data -- php artisan freescout:after-app-update 2>&1 | tail -5 || true
+runuser -u www-data -- php artisan migrate --force 2>&1 | tail -5 || true
 log "Hooks ausgeführt."
 
 # ── Supervisor starten ─────────────────────────────────────────────────────

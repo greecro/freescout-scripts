@@ -234,7 +234,7 @@ if [[ "$EXPECTED_SIG" != "$ACTUAL_SIG" ]]; then
 fi
 php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
 rm -f /tmp/composer-setup.php
-log "Composer installiert: $(composer --version --no-ansi 2>&1 | head -n1)"
+log "Composer installiert: $(COMPOSER_ALLOW_SUPERUSER=1 composer --version --no-ansi 2>/dev/null | head -n1)"
 
 # ── Phase 5: Nginx ─────────────────────────────────────────────────────────
 info "Phase 5/16: Nginx..."
@@ -299,8 +299,8 @@ cd /var/www
 git clone -b dist https://github.com/freescout-help-desk/freescout.git freescout >/dev/null 2>&1
 cd /var/www/freescout
 
-# Composer-Deps
-sudo -u www-data -H COMPOSER_ALLOW_SUPERUSER=0 \
+# Composer-Deps (als root — Files sind noch root-owned, chown -R weiter unten)
+COMPOSER_ALLOW_SUPERUSER=1 \
     composer install --no-dev --optimize-autoloader --no-interaction --quiet
 # storage-symlink
 cp .env.example .env
