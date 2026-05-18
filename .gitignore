@@ -1,0 +1,19 @@
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+
+# Persönliche Test-/Dump-Ordner — gehören nicht ins Repo
+freescout-export-*/
+freescout-import/
+*.sql
+*.sql.gz
+*.tar.gz
+*.tar.gz.age
+
+# Lokale Override-Files für Tests
+.env
+.env.local
+local.conf
