@@ -304,13 +304,28 @@ cd /var/www/freescout
 chown -R www-data:www-data /var/www/freescout
 
 # Composer als www-data; HOME=/tmp damit composer-Cache schreibbar ist.
-# --ignore-platform-reqs: dist-Branch composer.lock wurde gegen ältere PHP-Version gebaut.
-# KEIN --optimize-autoloader: rap2hpoutre/laravel-log-viewer hat src/controllers → src/
-# umstrukturiert, ClassMap-Gen scheitert dann. FreeScout-Doku empfiehlt's auch nicht.
-info "  composer install (kann dauern)..."
+# Zweiphasig: erst Pakete installieren ohne Autoloader-Generierung (--no-autoloader),
+# dann Stub-Verzeichnis anlegen und dump-autoload separat ausführen.
+# Hintergrund: rap2hpoutre/laravel-log-viewer entfernte src/controllers/ in neuerer Version;
+# FreeScout's composer.json hat "optimize-autoloader":true → ClassMapGenerator schlägt auf
+# dem nicht mehr existierenden Pfad fehl. Stub-Dir löst das ohne Änderung an composer.json.
+info "  composer install --no-autoloader (kann dauern)..."
 if ! runuser -u www-data -- env HOME=/tmp COMPOSER_HOME=/tmp/.composer-www \
-    composer install --no-dev --no-interaction --ignore-platform-reqs 2>&1 | tail -30; then
+    composer install --no-dev --no-interaction --ignore-platform-reqs --no-autoloader 2>&1 | tail -20; then
     err "composer install fehlgeschlagen"
+fi
+
+# Stub-Verzeichnis für defekten Classmap-Eintrag anlegen (muss NACH composer install sein,
+# da composer das vendor/-Paketverzeichnis beim Extrahieren überschreibt)
+mkdir -p /var/www/freescout/vendor/rap2hpoutre/laravel-log-viewer/src/controllers
+
+info "  composer dump-autoload..."
+if ! runuser -u www-data -- env HOME=/tmp COMPOSER_HOME=/tmp/.composer-www \
+    composer dump-autoload --optimize --no-scripts --no-interaction 2>&1 | tail -10; then
+    warn "  dump-autoload --optimize fehlgeschlagen; fallback ohne Optimierung..."
+    runuser -u www-data -- env HOME=/tmp COMPOSER_HOME=/tmp/.composer-www \
+        composer dump-autoload --no-scripts --no-interaction 2>&1 | tail -10 || \
+        err "dump-autoload fehlgeschlagen"
 fi
 
 # .env vorbefüllen — KEIN DB-Block, KEIN Mail-Block
