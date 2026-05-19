@@ -166,7 +166,8 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl wget unzip git ufw fail2ban supervisor cron rsync \
     ca-certificates apt-transport-https lsb-release gnupg locales tzdata jq age \
-    >/dev/null
+    openssh-server >/dev/null
+systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
 
 # Locale + Timezone
 sed -i 's/^# *\(de_DE.UTF-8\)/\1/' /etc/locale.gen 2>/dev/null || true
