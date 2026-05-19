@@ -195,7 +195,9 @@ max_allowed_packet = 64M
 EOF
 systemctl restart mariadb
 
-# DB + User anlegen
+# DB + User anlegen (idempotent: bei Rerun alten Stand wegräumen)
+mariadb -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`;"
+mariadb -e "DROP USER IF EXISTS '${DB_USER}'@'localhost';"
 mariadb -e "CREATE DATABASE \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mariadb -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
 mariadb -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';"
@@ -295,6 +297,7 @@ log "Nginx konfiguriert."
 # ── Phase 6: FreeScout-Files ───────────────────────────────────────────────
 info "Phase 6/16: FreeScout-Files (git clone + composer)..."
 mkdir -p /var/www
+[[ -d /var/www/freescout ]] && rm -rf /var/www/freescout
 cd /var/www
 git clone -b dist https://github.com/freescout-help-desk/freescout.git freescout >/dev/null 2>&1
 cd /var/www/freescout
