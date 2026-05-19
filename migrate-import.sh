@@ -139,11 +139,12 @@ chmod -R 755 "${INSTALL_DIR}/storage" "${INSTALL_DIR}/bootstrap/cache"
 [[ -d "${INSTALL_DIR}/Modules" ]] && chmod -R 755 "${INSTALL_DIR}/Modules"
 
 # ── Post-Update-Hooks ──────────────────────────────────────────────────────
-info "FreeScout-Hooks (clear-cache, after-app-update, migrate)..."
+info "FreeScout-Hooks (clear-cache, after-app-update, migrate, storage:link)..."
 cd "$INSTALL_DIR"
 runuser -u www-data -- php artisan freescout:clear-cache 2>&1 | tail -5 || true
 runuser -u www-data -- php artisan freescout:after-app-update 2>&1 | tail -5 || true
 runuser -u www-data -- php artisan migrate --force 2>&1 | tail -5 || true
+runuser -u www-data -- php artisan storage:link 2>&1 || true
 log "Hooks ausgeführt."
 
 # ── Supervisor starten ─────────────────────────────────────────────────────
