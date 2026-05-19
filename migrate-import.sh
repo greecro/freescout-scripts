@@ -99,6 +99,9 @@ log "Archive entpackt."
 info ".env aktualisieren (APP_KEY + DB)..."
 sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY}|" .env
 sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
+grep -q "^APP_TRUSTED_HOSTS=" .env \
+    && sed -i "s|^APP_TRUSTED_HOSTS=.*|APP_TRUSTED_HOSTS='${DOMAIN}'|" .env \
+    || echo "APP_TRUSTED_HOSTS='${DOMAIN}'" >> .env
 
 # DB-Block einfügen oder ersetzen
 if grep -q "^DB_HOST=" .env; then

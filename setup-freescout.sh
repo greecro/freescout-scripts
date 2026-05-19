@@ -337,6 +337,9 @@ cp .env.example .env
 sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
 grep -q "^APP_TIMEZONE=" .env && sed -i "s|^APP_TIMEZONE=.*|APP_TIMEZONE=${APP_TIMEZONE}|" .env || echo "APP_TIMEZONE=${APP_TIMEZONE}" >> .env
 grep -q "^APP_LOCALE=" .env && sed -i "s|^APP_LOCALE=.*|APP_LOCALE=${APP_LOCALE}|" .env || echo "APP_LOCALE=${APP_LOCALE}" >> .env
+grep -q "^APP_TRUSTED_HOSTS=" .env \
+    && sed -i "s|^APP_TRUSTED_HOSTS=.*|APP_TRUSTED_HOSTS='${DOMAIN}'|" .env \
+    || echo "APP_TRUSTED_HOSTS='${DOMAIN}'" >> .env
 chown www-data:www-data .env
 
 # APP_KEY als www-data
