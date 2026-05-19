@@ -45,43 +45,48 @@ CONTAINER_NAME=""
 APP_DATA_DIR=""
 
 if $USE_DOCKER; then
-    # Container anhand FQDN (Label oder Name) finden
-    # Cloudron setzt das Label "fqdn" oder den Container-Namen enthält den App-Hostname
-    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -i "$(echo "$APP_FQDN" | cut -d. -f1)" | head -n1 || true)
+    # Cloudron benennt Container nach der App-UUID; automatischer Match über Docker-Label
+    CONTAINER_NAME=$(docker ps --filter "label=location=${APP_FQDN}" --format '{{.Names}}' | head -n1 || true)
 
     if [[ -z "$CONTAINER_NAME" ]]; then
-        # Fallback: alle laufenden Container anzeigen, User wählt
+        # Fallback: alle laufenden Container anzeigen — Cloudron-App-Container sind UUIDs
         echo ""
-        echo "Laufende Container (kein automatischer Match für '${APP_FQDN}'):"
-        docker ps --format "  {{.Names}}\t{{.Image}}" | head -20
+        echo "Laufende Container (bitte exakten Namen (UUID) des FreeScout-Containers eingeben):"
+        printf "  %-45s %s\n" "NAME" "IMAGE"
+        docker ps --format '{{.Names}}\t{{.Image}}' | while IFS=$'\t' read -r name image; do
+            printf "  %-45s %s\n" "$name" "$image"
+        done
         echo ""
-        read -rp "Container-Name eingeben: " CONTAINER_NAME
+        read -rp "Container-Name (exakt, Groß-/Kleinschreibung beachten): " CONTAINER_NAME
     fi
     [[ -z "$CONTAINER_NAME" ]] && err "Kein Container angegeben."
 
+    # Existenz prüfen
+    docker inspect "$CONTAINER_NAME" >/dev/null 2>&1 || \
+        err "Container '${CONTAINER_NAME}' nicht gefunden. Name muss exakt stimmen (siehe Liste oben)."
+
     # App-ID aus Cloudron-Datenverzeichnis ableiten
-    # Cloudron hängt App-Daten unter /home/yellowtent/appsdata/<id>/ ein
     APP_DATA_DIR=$(docker inspect "$CONTAINER_NAME" \
         --format '{{range .Mounts}}{{if eq .Destination "/app/data"}}{{.Source}}{{end}}{{end}}' \
         2>/dev/null || true)
 
     if [[ -z "$APP_DATA_DIR" ]]; then
-        # Alternativ: /app/code Mount prüfen
         APP_DATA_DIR=$(docker inspect "$CONTAINER_NAME" \
             --format '{{range .Mounts}}{{if eq .Destination "/app/code"}}{{.Source}}{{end}}{{end}}' \
             2>/dev/null || true)
     fi
 
     if [[ -z "$APP_DATA_DIR" ]] || [[ ! -d "$APP_DATA_DIR" ]]; then
-        # Manueller Fallback
         echo ""
         echo "Mounts dieses Containers:"
-        docker inspect "$CONTAINER_NAME" --format '{{range .Mounts}}  {{.Source}} → {{.Destination}}{{"\n"}}{{end}}' 2>/dev/null || true
+        docker inspect "$CONTAINER_NAME" \
+            --format '{{range .Mounts}}  {{.Source}} → {{.Destination}}{{"\n"}}{{end}}' 2>/dev/null || true
         echo ""
-        read -rp "App-Daten-Verzeichnis (lokaler Host-Pfad mit storage/Modules): " APP_DATA_DIR
+        read -rp "App-Daten-Verzeichnis (Host-Pfad, enthält storage/ oder Modules/): " APP_DATA_DIR
     fi
     [[ ! -d "$APP_DATA_DIR" ]] && err "Verzeichnis nicht gefunden: ${APP_DATA_DIR}"
-    APP_ID=$(basename "$(dirname "$APP_DATA_DIR")" 2>/dev/null || echo "$CONTAINER_NAME")
+    # APP_ID = letztes Segment des Datenpfads (UUID bei Cloudron)
+    APP_ID=$(basename "$APP_DATA_DIR")
     log "Container: ${CONTAINER_NAME}"
 
 else
