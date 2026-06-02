@@ -140,6 +140,10 @@ info "Permissions setzen..."
 chown -R www-data:www-data "$INSTALL_DIR"
 chmod -R 755 "${INSTALL_DIR}/storage" "${INSTALL_DIR}/bootstrap/cache"
 [[ -d "${INSTALL_DIR}/Modules" ]] && chmod -R 755 "${INSTALL_DIR}/Modules"
+# Sicherstellen dass cache/data-Unterverzeichnisse beschreibbar sind
+# (Cloudron-Tar kann abweichende Ownership mitbringen)
+find "${INSTALL_DIR}/storage" -type d -exec chmod 755 {} \;
+find "${INSTALL_DIR}/storage" -type f -exec chmod 644 {} \;
 
 # ── Post-Update-Hooks ──────────────────────────────────────────────────────
 info "FreeScout-Hooks (clear-cache, after-app-update, migrate, storage:link)..."
