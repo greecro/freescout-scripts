@@ -100,6 +100,9 @@ else
 fi
 chown -R www-data:www-data "${INSTALL_DIR}/storage"
 chmod -R 755 "${INSTALL_DIR}/storage"
+# Framework-Verzeichnisse sicherstellen (fehlen nach Storage-Restore aus R2-Mirror)
+mkdir -p "${INSTALL_DIR}/storage/framework/"{views,cache/data,sessions}
+chown -R www-data:www-data "${INSTALL_DIR}/storage/framework"
 log "Storage importiert."
 
 # ── Cache + Hooks ──────────────────────────────────────────────────────────
