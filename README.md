@@ -1,6 +1,13 @@
-# FreeScout Scripts
+# freescout-scripts
 
-Vollautomatisches Setup für [FreeScout](https://github.com/freescout-help-desk/freescout) (PHP/Laravel-Helpdesk) auf Proxmox als LXC-Container. Inklusive Backups nach Cloudflare R2, Queue-Worker via Supervisor, FreeScout-Scheduler via Cron, Authentik-OIDC-Vorbereitung und Migration aus einer bestehenden Cloudron-Installation.
+Vollautomatisches Setup für [FreeScout](https://github.com/freescout-help-desk/freescout) auf Proxmox als Debian-13-LXC-Container — inklusive Cloudron-Migration, tägliche Backups nach Cloudflare R2, Queue-Worker via Supervisor und Ops-Toolbox.
+
+![Shell](https://img.shields.io/badge/shell-bash-green)
+![Platform](https://img.shields.io/badge/platform-Proxmox%20%7C%20Debian%2013-blue)
+![PHP](https://img.shields.io/badge/PHP-8.3-purple)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+---
 
 ## Architektur
 
@@ -12,44 +19,72 @@ Internet → Cloudflare → NPMPlus (SSL, Real-IP) → LXC FreeScout
                                                       ├─ Supervisor (Queue-Worker)
                                                       ├─ Cron (FreeScout-Scheduler)
                                                       └─ Backups → r2:backups/freescout/
-                                                            ├─ db-<hostname>/      (täglich, gzip + optional age)
-                                                            └─ storage-<hostname>/ (täglich, rclone-Mirror)
+                                                            ├─ db-<hostname>/      (täglich 02:00, gzip + optional age)
+                                                            └─ storage-<hostname>/ (täglich 03:00, rclone-Mirror)
 
-         SMTP-Outgoing ← pro Mailbox im FreeScout-UI konfiguriert (nicht im .env)
-         Authentik-OIDC ← Stub (manuell aktivieren nach Modul-Kauf)
+         SMTP-Outgoing ← pro Mailbox im FreeScout-UI konfiguriert (nicht in .env)
+         Authentik-OIDC ← Stub vorbereitet (Modul separat kaufen, ~49 USD)
          UptimeKuma ← Push-Webhooks bei Backup-/Health-Fehlern
 ```
 
 ---
 
-## Scripts
+## Scripts — Übersicht
 
 | Script | Ausführen auf | Zweck | Wann |
 |---|---|---|---|
-| `proxmox-create-freescout-ct.sh` | Proxmox Host | Debian-13-LXC anlegen, IP konfigurieren, SSH-Key einspielen | Einmalig |
-| `setup-freescout.sh` | LXC | Stack (Nginx, PHP, MariaDB, Supervisor) + FreeScout-Files vorbereiten | Einmalig |
-| `migrate-from-cloudron.sh` | Cloudron-Host | Export-Bundle erzeugen (SQL, storage, Modules, uploads, APP_KEY) | Einmalig (bei Migration) |
-| `migrate-import.sh` | LXC | Export-Bundle importieren, überspringt Web-Installer | Einmalig (bei Migration) |
-| `db-backup.sh` | LXC | MariaDB-Dump → R2 (flock, optional age) | Täglich (Cron 02:00) |
-| `storage-backup.sh` | LXC | storage/ + Modules/ → R2 (rclone-Mirror, flock) | Täglich (Cron 03:00) |
-| `backup-verify.sh` | LXC | Integritätsprüfung der R2-Backups | Wöchentlich (Cron So 04:00) |
-| `update-freescout.sh` | LXC | Pre-Update-Snapshot + git pull + composer + artisan | Bei Bedarf |
-| `restore.sh` | LXC | DB + Storage aus R2-Backup wiederherstellen (mit HTTP-Test) | Bei Bedarf |
+| `proxmox-create-freescout-ct.sh` | Proxmox Host | Debian-13-LXC anlegen, IP + SSH konfigurieren | Einmalig |
+| `setup-freescout.sh` | LXC | Stack (Nginx, PHP, MariaDB, Supervisor) + FreeScout installieren | Einmalig |
+| `migrate-from-cloudron.sh` | Cloudron-Host | Export-Bundle erzeugen (SQL, storage, Modules, APP_KEY) | Einmalig (Migration) |
+| `migrate-import.sh` | LXC | Export-Bundle importieren, Web-Installer überspringen | Einmalig (Migration) |
+| `db-backup.sh` | LXC | MariaDB-Dump → R2 (flock, optional age-verschlüsselt) | Täglich |
+| `storage-backup.sh` | LXC | storage/ + Modules/ → R2 (rclone-Mirror) | Täglich |
+| `backup-verify.sh` | LXC | Integritätsprüfung R2-Backups (+ monatlich Test-Restore) | Wöchentlich |
+| `update-freescout.sh` | LXC | Pre-Snapshot + git pull + composer + artisan | Bei Bedarf |
+| `restore.sh` | LXC | DB + Storage aus R2 oder lokalem Snapshot wiederherstellen | Bei Bedarf |
 | `status.sh` | LXC | Dashboard: Version, Disk, Queue, Cron, SSL, letzte Backups | Bei Bedarf |
-| `health-check.sh` | LXC | HTTP, DB, Queue-Worker, Cron + Webhook bei Fehler | Bei Bedarf / Cron |
+| `health-check.sh` | LXC | HTTP, DB, Queue, Cron + Webhook bei Fehler | Bei Bedarf / Cron |
 
 ---
 
-## Komplette Einrichtung — Schritt für Schritt
+## Schritt-für-Schritt-Anleitung
 
-### Schritt 1 — LXC anlegen (Proxmox-Host)
+### Voraussetzungen
+
+- Proxmox VE (getestet mit PVE 8.x)
+- Debian-13-Template in Proxmox verfügbar (`pveam update && pveam download local debian-13-standard`)
+- Cloudflare R2 Bucket + API-Credentials (Access Key ID + Secret)
+- Domain mit DNS-Eintrag auf deine IP / NPMPlus
+- NPMPlus als Reverse Proxy (oder Nginx Proxy Manager)
+
+---
+
+### Schritt 1 — LXC erstellen (Proxmox-Host)
+
+Auf dem Proxmox-Host als root:
 
 ```bash
-curl -sO https://git.janzin.net/djanzin/freescout-scripts/raw/branch/main/proxmox-create-freescout-ct.sh
+curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/proxmox-create-freescout-ct.sh
 bash proxmox-create-freescout-ct.sh
 ```
 
-Erstellt einen Debian-13-LXC (Standard: 2 vCPU, 2 GB RAM, 20 GB Disk), konfiguriert IP/SSH, gibt root-Passwort + Verbindungsbefehl aus.
+Das Script fragt interaktiv ab:
+- Container-ID (default: nächste freie)
+- Hostname (default: `freescout`)
+- IP-Adresse + Gateway
+- Proxmox-Storage, vCPU, RAM, Disk
+
+**Non-interactive (CI/Automation):**
+```bash
+bash proxmox-create-freescout-ct.sh \
+  --ct-id 120 \
+  --hostname freescout \
+  --ip 10.1.20.10/24 \
+  --gateway 10.1.20.1 \
+  --storage local-zfs \
+  --cores 2 --ram 2048 --disk 20 \
+  --yes
+```
 
 **Empfohlene Ressourcen:**
 
@@ -61,170 +96,293 @@ Erstellt einen Debian-13-LXC (Standard: 2 vCPU, 2 GB RAM, 20 GB Disk), konfiguri
 
 ---
 
-### Schritt 2 — FreeScout-Stack vorbereiten (im LXC)
+### Schritt 2 — FreeScout-Stack installieren (im LXC)
+
+Per SSH ins LXC einloggen:
 
 ```bash
 ssh root@<lxc-ip>
-curl -sO https://git.janzin.net/djanzin/freescout-scripts/raw/branch/main/setup-freescout.sh
+```
+
+Setup-Script laden und ausführen:
+
+```bash
+curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/setup-freescout.sh
 bash setup-freescout.sh
 ```
 
-Installiert MariaDB, PHP 8.3, Nginx, Supervisor, rclone, ufw, fail2ban; legt FreeScout-Files unter `/var/www/freescout` an; konfiguriert Backup-Crons; schreibt `.env` mit APP_KEY + URL (ohne DB-Block — das macht der Web-Installer).
+Das Script fragt ab und installiert dann vollautomatisch:
 
-Am Ende werden ausgegeben:
-- DB-Credentials (für Web-Installer)
+**Abfragen:**
+- Domain (FQDN, z.B. `desk.example.com`)
+- Locale / Timezone (Standard: `de` / `Europe/Berlin`)
+- DB-Name + DB-User (Standard: `freescout`)
+- R2-Endpoint, Bucket, Pfad-Prefix, Access Key, Secret Key
+- Optionale age-Verschlüsselung für DB-Backups (Public Key)
+- Optionaler Authentik-OIDC-Stub (Issuer, Client-ID, Secret)
+- Optionale UptimeKuma-Push-Webhook-URL
+
+**Was installiert wird:**
+- System: `curl`, `wget`, `git`, `ufw`, `fail2ban`, `supervisor`, `cron`, `rsync`, `age`, `openssh-server`
+- MariaDB 11 (apt.mariadb.org)
+- PHP 8.3 + Extensions: `fpm`, `mysql`, `gd`, `mbstring`, `xml`, `curl`, `zip`, `bcmath`, `imap`, `intl`, `ldap`
+- Nginx
+- rclone (für R2-Backups)
+- FreeScout (aus `git clone -b dist`)
+- Supervisor-Config für Queue-Worker
+- Cron-Jobs (FreeScout-Scheduler, DB-Backup, Storage-Backup, Backup-Verify)
+- UFW-Firewall (22, 80, 443)
+- fail2ban (SSH + Nginx)
+- `/etc/freescout/config` (zentrale Konfigurationsdatei für alle Scripts)
+
+Am Ende gibt das Script aus:
+- DB-Credentials (Pfad: `/etc/freescout/db-credentials.txt`)
 - Web-Installer-URL
-- NPMPlus-Hinweis
+- NPMPlus-Konfigurationshinweis
 
 ---
 
-### Schritt 3 — NPMPlus Proxy-Host konfigurieren
+### Schritt 3 — NPMPlus Proxy-Host einrichten
 
-Im NPMPlus-UI einen neuen Proxy-Host anlegen:
+Im NPMPlus-UI neuen Proxy-Host anlegen:
 
 | Feld | Wert |
 |---|---|
-| Domain | `<deine-domain>` |
+| Domain Names | `desk.example.com` |
 | Scheme | `http` |
-| Forward IP | `<lxc-ip>` |
+| Forward Hostname/IP | `<lxc-ip>` |
 | Forward Port | `80` |
-| Block Common Exploits | aktiv |
-| Websocket Support | **aktiv** (wichtig für FreeScout-Echo) |
-| SSL Certificate | Let's Encrypt, Force SSL, HTTP/2 |
+| Block Common Exploits | ✓ aktiv |
+| Websocket Support | ✓ aktiv (wichtig für FreeScout Echo!) |
 
-**Custom Nginx Config** (im "Advanced"-Tab):
+**SSL-Tab:**
+- Let's Encrypt aktivieren
+- Force SSL ✓
+- HTTP/2 Support ✓
+
+**Advanced-Tab (Custom Nginx Config):**
 ```nginx
+proxy_set_header Host $host;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Real-IP $remote_addr;
 ```
 
+> **Wichtig:** `proxy_set_header Host $host;` muss gesetzt sein — FreeScout prüft den `Host`-Header gegen `APP_TRUSTED_HOSTS` und lehnt alle Requests ab, wenn der Header fehlt.
+
 ---
 
-### Schritt 4 — Variante A: Fresh-Install via Web-Installer
+### Schritt 4A — Fresh-Install via Web-Installer
 
-Browser öffnen: `https://<deine-domain>/install`
+Browser öffnen: `https://desk.example.com/install`
 
 Eintragen:
-- **Database**: Host `127.0.0.1`, Port `3306`, DB-Name/User/Pass aus Script-Output (Datei: `/etc/freescout/db-credentials.txt`)
-- **Admin-User**: Name + Email + Passwort
+- **Database Host:** `127.0.0.1`
+- **Database Port:** `3306`
+- **Database Name / User / Password:** aus `/etc/freescout/db-credentials.txt`
+- **Admin Name / Email / Passwort:** beliebig wählen
 
-Web-Installer migriert DB-Schema und legt Admin-User an.
+Der Web-Installer migriert das DB-Schema und legt den Admin-User an.
 
-### Schritt 4 — Variante B: Migration aus Cloudron
+> Nach dem Web-Installer: `supervisorctl start freescout-worker:*`
+
+---
+
+### Schritt 4B — Migration aus Cloudron
 
 **Auf dem Cloudron-Host** (als root):
 
 ```bash
-curl -sO https://git.janzin.net/djanzin/freescout-scripts/raw/branch/main/migrate-from-cloudron.sh
+curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/migrate-from-cloudron.sh
 bash migrate-from-cloudron.sh
 ```
 
-Erzeugt ein Export-Bundle (`/tmp/freescout-export-<datum>/`) mit:
-- `freescout.sql.gz` (MySQL-Dump)
-- `storage.tar.gz` (Anhänge)
-- `modules.tar.gz` (alle installierten Module)
-- `uploads.tar.gz`
-- `env-snapshot.txt` (APP_KEY + ausgewählte Settings)
-- `MANIFEST.sha256`
+Das Script erkennt automatisch ob `docker` oder `cloudron`-CLI verfügbar ist.
 
-**Bundle aufs Target-LXC kopieren:**
+Es wird abgefragt:
+- FreeScout-App-FQDN (bisherige Domain in Cloudron)
+
+Das Script erzeugt ein Export-Bundle (z.B. `/tmp/freescout-export-20240601-120000/`) mit:
+
+```
+freescout-export-DATUM/
+├── freescout.sql.gz       # MySQL-Dump (gzip-komprimiert)
+├── storage.tar.gz         # Anhänge, Logs, Cache
+├── modules.tar.gz         # Alle installierten Module (inkl. Lizenz-Bindings)
+├── uploads.tar.gz         # Public Uploads
+├── env-snapshot.txt       # APP_KEY + ausgewählte .env-Settings
+└── MANIFEST.sha256        # Checksums für Integritätsprüfung
+```
+
+**Bundle aufs Ziel-LXC übertragen:**
 
 ```bash
-rsync -avz /tmp/freescout-export-<datum>/ root@<lxc-ip>:/root/freescout-import/
+rsync -avz --progress /tmp/freescout-export-DATUM/ root@<lxc-ip>:/root/freescout-import/
 ```
 
 **Im LXC importieren:**
 
 ```bash
 ssh root@<lxc-ip>
-curl -sO https://git.janzin.net/djanzin/freescout-scripts/raw/branch/main/migrate-import.sh
+curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/migrate-import.sh
 bash migrate-import.sh /root/freescout-import/
 ```
 
-Importiert SQL, entpackt Archive, übernimmt **APP_KEY** (kritisch — sonst sind verschlüsselte SMTP-Settings in der DB unleserlich), führt Post-Update-Hooks aus, startet Worker.
+`migrate-import.sh` erledigt automatisch:
+1. MANIFEST.sha256-Prüfung (Integritätscheck)
+2. SQL-Import (DB wird bei Bedarf geleert)
+3. Archive entpacken (storage, Modules, uploads)
+4. `.env` aktualisieren (APP_KEY übernehmen — **kritisch** für SMTP-Decryption in DB)
+5. `APP_TRUSTED_HOSTS` setzen
+6. Composer-Deps für Module nachziehen
+7. Permissions setzen (`www-data:www-data`)
+8. Post-Update-Hooks (`clear-cache`, `after-app-update`, `migrate`, `storage:link`)
+9. Queue-Worker starten
+10. HTTP-Smoketest (Login-Seite)
 
-Web-Installer entfällt in diesem Modus.
+> **Nach der Migration:** Falls Module leer oder kaputt erscheinen → Manage → Modules → jedes Modul einmal deaktivieren + reaktivieren (registriert sich neu).
 
 ---
 
-### Schritt 5 — Queue-Worker aktivieren
-
-Nach Fresh-Install (entfällt bei Migration — macht `migrate-import.sh` automatisch):
+### Schritt 5 — Queue-Worker prüfen
 
 ```bash
-supervisorctl start freescout-worker:*
 supervisorctl status
+# freescout-worker:freescout-worker_00   RUNNING   pid 1234, uptime 0:01:00
+```
+
+Falls STOPPED:
+```bash
+supervisorctl start freescout-worker:*
 ```
 
 ---
 
-### Schritt 6 — Mailbox-SMTP prüfen
+### Schritt 6 — Mailbox-SMTP konfigurieren
 
-FreeScout sendet ausgehende Mails pro Mailbox mit individuellen SMTP-Creds. Diese werden im FreeScout-UI unter **Manage → Mailboxes → Connection Settings** konfiguriert.
+FreeScout sendet ausgehende Mails **pro Mailbox** mit individuellen SMTP-Credentials.
 
-- **Bei Migration**: SMTP-Settings kommen mit dem SQL-Dump mit und funktionieren ohne weitere Aktion (sofern APP_KEY korrekt übernommen wurde).
-- **Bei Fresh-Install**: pro Mailbox manuell eintragen.
-
----
-
-### Schritt 7 — Optional: Authentik-OIDC-Aktivierung
-
-FreeScout's OIDC-Anbindung ist ein **kostenpflichtiges Modul** (~49 $). `setup-freescout.sh` hat bereits Authentik-Stubs in `/etc/freescout/oidc.env` abgelegt (falls beim Setup angegeben).
-
-1. **In Authentik:**
-   - Provider: OAuth2/OpenID Provider erstellen
-   - Application: anlegen, Provider zuweisen
-   - Redirect-URI: `https://<deine-domain>/oauth/callback`
-2. **In FreeScout:**
-   - OAuth/OIDC-Modul auf [freescout.net/modules](https://freescout.net/modules) kaufen
-   - Hochladen unter Manage → Modules
-   - Aktivieren, Issuer/Client-ID/Secret aus `/etc/freescout/oidc.env` ins UI übernehmen
+- **Bei Migration:** SMTP-Settings kommen mit dem SQL-Dump — funktionieren automatisch, sofern APP_KEY korrekt übernommen wurde
+- **Bei Fresh-Install:** Manage → Mailboxes → Connection Settings → SMTP-Zugangsdaten eintragen
 
 ---
 
-## Backups
+### Schritt 7 (Optional) — Authentik-OIDC
 
-- **Layout**: `r2:backups/freescout/db-<hostname>/` (SQL-Dumps), `r2:backups/freescout/storage-<hostname>/` (Files-Mirror)
-- **Frequenz**: täglich 02:00 (DB) + 03:00 (storage)
-- **Retention**: 7 Tage lokal, danach von rclone-Mirror übernommen (R2-Versioning empfohlen)
-- **Encryption (optional)**: age-Verschlüsselung, Recipient Public Key wird bei Setup abgefragt
-- **Bandbreite**: `--bwlimit "08:00,8M 22:00,off"` (tagsüber 8 MB/s, nachts unlimitiert)
-- **flock-protected**: keine Doppelläufe bei langen Backups
-- **Verify**: wöchentlich (So 04:00) — `gunzip -t` + SQL-Header-Check; `--deep` am 1. des Monats macht Test-Restore in temporäre DB
-- **Pre-Update-Snapshots**: `update-freescout.sh` legt vor Updates DB + Storage als Snapshot ab (5 retention)
+FreeScout's OIDC-Integration ist ein **kostenpflichtiges Modul** (ca. 49 USD, [freescout.net/modules](https://freescout.net/modules)).
+
+1. **In Authentik:** OAuth2/OpenID Provider erstellen, Application anlegen, Redirect-URI: `https://desk.example.com/oauth/callback`
+2. **In FreeScout:** Modul hochladen (Manage → Modules), aktivieren, Issuer/Client-ID/Secret aus `/etc/freescout/oidc.env` übernehmen
 
 ---
 
-## Monitoring & Alerts
+## Backup-Konzept
 
-- **UptimeKuma**: Push-Webhook bei Setup abgefragt — wird von `db-backup.sh`, `storage-backup.sh`, `backup-verify.sh`, `health-check.sh` bei Fehlern getriggert
-- **Format**: `${WEBHOOK_URL}?status=down&msg=<details>`
-- **Cron-Schedule**:
+| Backup-Typ | Pfad | Frequenz | Retention |
+|---|---|---|---|
+| DB-Dump (gzip) | `r2:backups/freescout/db-<hostname>/` | Täglich 02:00 | 7 Tage lokal, R2 per Versioning |
+| Storage-Mirror | `r2:backups/freescout/storage-<hostname>/` | Täglich 03:00 | rclone-Mirror (laufend aktuell) |
+| Pre-Update-Snapshot | `/var/snapshots/freescout-<datum>/` | Vor jedem Update | 5 Stück (automatische Rotation) |
 
-| Zeit | Script | Zweck |
+**Features:**
+- `flock`-protected: keine Doppelläufe bei langen Backups
+- Optionale `age`-Verschlüsselung für DB-Dumps (Recipient Public Key)
+- Bandbreitenlimit: `08:00–22:00: 8 MB/s`, nachts unlimitiert
+- Wöchentliche Integritätsprüfung (`backup-verify.sh`): `gunzip -t` + SQL-Header-Check
+- Monatlich (1. des Monats): Test-Restore in temporäre DB mit `--deep`
+
+**Manuelle Befehle:**
+```bash
+# Manuelles DB-Backup auslösen
+bash /usr/local/bin/freescout-db-backup.sh
+
+# R2-Backups prüfen
+rclone lsd r2:backups/freescout/
+
+# Restore (interaktiv)
+bash /usr/local/bin/freescout-restore.sh
+```
+
+---
+
+## Monitoring & Cron-Übersicht
+
+| Zeit | Command | Zweck |
 |---|---|---|
-| `* * * * *` | `php artisan schedule:run` | FreeScout-Scheduler |
-| `0 2 * * *` | `db-backup.sh` | DB → R2 |
-| `0 3 * * *` | `storage-backup.sh` | storage → R2 |
-| `0 4 * * 0` | `backup-verify.sh` | Wöchentliche Verify |
+| `* * * * *` | `php artisan schedule:run` (www-data) | FreeScout-Scheduler (Queue, Mail-Abruf) |
+| `0 2 * * *` | `freescout-db-backup.sh` | DB → R2 |
+| `0 3 * * *` | `freescout-storage-backup.sh` | storage → R2 |
+| `0 4 * * 0` | `freescout-backup-verify.sh` | Wöchentliche R2-Verify |
+
+Push-Webhook (UptimeKuma): `${WEBHOOK_URL}?status=up|down&msg=<details>`
+
+---
+
+## Update
+
+```bash
+bash /usr/local/bin/freescout-update.sh
+```
+
+Das Script:
+1. Legt Pre-Update-Snapshot in `/var/snapshots/` ab (DB + storage)
+2. `git pull` auf dem dist-Branch
+3. `composer install --no-dev`
+4. `php artisan freescout:clear-cache`
+5. `php artisan freescout:after-app-update`
+6. `php artisan migrate --force`
+7. HTTP-Smoketest — bei Fehler automatischer Rollback zum Snapshot
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Wahrscheinliche Ursache | Lösung |
+| Symptom | Ursache | Lösung |
 |---|---|---|
-| `/install` öffnet sich, obwohl migriert | `APP_KEY` falsch oder DB leer | `migrate-import.sh` neu laufen lassen, `env-snapshot.txt` prüfen |
-| Module zeigen "License Invalid" | Domain hat sich geändert | Im UI Modul deaktivieren + reaktivieren |
-| Queue-Worker startet nicht | DB nicht migriert oder Worker abgestürzt | `supervisorctl restart freescout-worker:*`, `journalctl -u supervisor` |
-| Cron läuft nicht | Crontab fehlt für `www-data` | `crontab -u www-data -l` prüfen |
-| Mails kommen nicht raus | Mailbox-SMTP nicht konfiguriert | UI → Manage → Mailboxes → Connection Settings |
+| `/install` öffnet sich nach Migration | APP_KEY falsch oder DB leer | `migrate-import.sh` erneut ausführen, `env-snapshot.txt` prüfen |
+| Leere Seite / Toggle-Navigation nur | Plugin-Konflikt nach Migration | Manage → Modules → Modul deaktivieren + reaktivieren |
+| "Untrusted Host" Fehler | `APP_TRUSTED_HOSTS` fehlt in `.env` | `grep APP_TRUSTED_HOSTS /var/www/freescout/.env` prüfen |
+| "Untrusted Host" obwohl gesetzt | NPMPlus sendet keinen `Host`-Header | Advanced-Tab: `proxy_set_header Host $host;` hinzufügen |
+| Module zeigen "License Invalid" | Domain hat sich geändert | Modul deaktivieren + reaktivieren |
+| Queue-Worker STOPPED | DB noch nicht migriert oder Absturz | `supervisorctl start freescout-worker:*`, `journalctl -u supervisor` |
+| Mails kommen nicht raus | Mailbox-SMTP fehlt | Manage → Mailboxes → Connection Settings |
 | 502 Bad Gateway | PHP-FPM down | `systemctl status php8.3-fpm`, `journalctl -u php8.3-fpm` |
-| R2-Backup schlägt fehl | rclone.conf falsch, Token abgelaufen | `/root/.config/rclone/rclone.conf` prüfen, `rclone lsd r2:` testen |
+| "valid cache path" Fehler nach Restore | `storage/framework/`-Unterverzeichnisse fehlen (R2 löscht leere Dirs) | `restore.sh` erstellt diese automatisch; oder manuell: `mkdir -p /var/www/freescout/storage/framework/{views,cache/data,sessions}` |
+| "Required PHP extensions: ldap" | `php8.3-ldap` nicht installiert | `apt-get install -y php8.3-ldap && systemctl restart php8.3-fpm` |
+| R2-Backup 401 Unauthorized | Falsche rclone-Credentials | `/root/.config/rclone/rclone.conf` prüfen, `rclone lsd r2:` testen |
+| Permission denied auf storage/ | Ownership-Problem (z.B. nach Restore) | `chown -R www-data:www-data /var/www/freescout/storage` |
+
+---
+
+## Dateistruktur nach Installation
+
+```
+/var/www/freescout/          # FreeScout-Root (www-data)
+/etc/freescout/
+├── config                   # Zentrale Config (sourcen alle Scripts)
+├── db-credentials.txt       # DB-Passwort (root:root, 600)
+├── oidc.env                 # OIDC-Stub (falls konfiguriert)
+└── backup-recipient.txt     # age Public Key (falls konfiguriert)
+/usr/local/bin/
+├── freescout-db-backup.sh
+├── freescout-storage-backup.sh
+├── freescout-backup-verify.sh
+├── freescout-update.sh
+├── freescout-restore.sh
+├── freescout-status.sh
+└── freescout-health-check.sh
+/var/backups/freescout-db/   # Lokale DB-Dumps (7-Tage-Retention)
+/var/snapshots/              # Pre-Update-Snapshots (5er-Rotation)
+/var/log/
+├── freescout-db-backup.log
+├── freescout-storage-backup.log
+└── freescout-backup-verify.log
+```
 
 ---
 
 ## Lizenz
 
-Diese Scripts sind als Hilfestellung gedacht und kommen **ohne Gewähr**. FreeScout selbst steht unter der AGPL — siehe [github.com/freescout-help-desk/freescout](https://github.com/freescout-help-desk/freescout).
+MIT — diese Scripts sind als Hilfestellung gedacht und kommen ohne Gewähr.
+
+FreeScout selbst steht unter der AGPL. Siehe [github.com/freescout-help-desk/freescout](https://github.com/freescout-help-desk/freescout).
