@@ -499,9 +499,12 @@ for script in db-backup.sh storage-backup.sh backup-verify.sh update-freescout.s
 done
 
 # Backup-Crons (root)
+# Kein flock im Cron-Aufruf: db-backup.sh/storage-backup.sh nehmen intern selbst
+# einen flock auf dasselbe Lockfile. Ein zusätzliches Cron-flock kollidiert damit,
+# das Skript hält sich für einen Doppellauf und bricht sofort mit exit 0 ab.
 crontab -l 2>/dev/null > /tmp/cron.root || true
-grep -q "db-backup.sh"      /tmp/cron.root || echo "0 2 * * * /usr/bin/flock -n /var/lock/freescout-db-backup.lock      /usr/local/sbin/db-backup.sh" >> /tmp/cron.root
-grep -q "storage-backup.sh" /tmp/cron.root || echo "0 3 * * * /usr/bin/flock -n /var/lock/freescout-storage-backup.lock /usr/local/sbin/storage-backup.sh" >> /tmp/cron.root
+grep -q "db-backup.sh"      /tmp/cron.root || echo "0 2 * * * /usr/local/sbin/db-backup.sh" >> /tmp/cron.root
+grep -q "storage-backup.sh" /tmp/cron.root || echo "0 3 * * * /usr/local/sbin/storage-backup.sh" >> /tmp/cron.root
 grep -q "backup-verify.sh"  /tmp/cron.root || echo "0 4 * * 0 /usr/local/sbin/backup-verify.sh" >> /tmp/cron.root
 crontab /tmp/cron.root
 rm -f /tmp/cron.root
