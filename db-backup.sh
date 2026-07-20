@@ -65,15 +65,11 @@ else
     err "Remote-Sync fehlgeschlagen."
 fi
 
-# ── Webhook bei Fehler ─────────────────────────────────────────────────────
-if [[ "$ERRORS" -gt 0 ]] && [[ -n "${WEBHOOK_URL:-}" ]]; then
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=down" \
-        --data-urlencode "msg=FreeScout DB-Backup hat ${ERRORS} Fehler — siehe ${LOG_FILE}" >/dev/null || true
-elif [[ -n "${WEBHOOK_URL:-}" ]]; then
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=up" \
-        --data-urlencode "msg=DB-Backup OK ($(du -h "$DUMP_FILE" | cut -f1))" >/dev/null || true
+# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
+if [[ "$ERRORS" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    curl -fsS -X POST -H 'Content-type: application/json' \
+        --data "{\"text\": \"🔴 FreeScout DB-Backup: ${ERRORS} Fehler auf ${APP_HOSTNAME} — siehe ${LOG_FILE}\"}" \
+        "$SLACK_WEBHOOK_URL" >/dev/null || true
 fi
 
 exit $ERRORS

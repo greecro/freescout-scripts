@@ -56,16 +56,13 @@ if [[ "$FAILED" -gt 0 ]]; then
     warn "Failed Jobs in DB: ${FAILED} (Manage → System → Logs prüfen)"
 fi
 
-# ── Webhook ────────────────────────────────────────────────────────────────
-if [[ "${#ERRORS[@]}" -gt 0 ]] && [[ -n "${WEBHOOK_URL:-}" ]]; then
-    MSG="Health-Check: $(IFS='; '; echo "${ERRORS[*]}")"
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=down" \
-        --data-urlencode "msg=${MSG}" >/dev/null || true
-elif [[ -n "${WEBHOOK_URL:-}" ]]; then
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=up" \
-        --data-urlencode "msg=FreeScout health OK" >/dev/null || true
+# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
+if [[ "${#ERRORS[@]}" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    # Fehlertexte JSON-safe machen (Quotes/Newlines raus)
+    MSG="$(IFS='; '; echo "${ERRORS[*]}" | tr '\n' ' ' | sed 's/"/'"'"'/g')"
+    curl -fsS -X POST -H 'Content-type: application/json' \
+        --data "{\"text\": \"🔴 FreeScout Health-Check auf ${APP_HOSTNAME:-?}: ${MSG}\"}" \
+        "$SLACK_WEBHOOK_URL" >/dev/null || true
 fi
 
 exit "${#ERRORS[@]}"

@@ -314,7 +314,7 @@ bash /usr/local/bin/freescout-restore.sh
 | `0 3 * * *` | `freescout-storage-backup.sh` | storage → R2 |
 | `0 4 * * 0` | `freescout-backup-verify.sh` | Wöchentliche R2-Verify |
 
-Push-Webhook (UptimeKuma): `${WEBHOOK_URL}?status=up|down&msg=<details>`
+Slack-Alert bei Fehlern: POST an `SLACK_WEBHOOK_URL` (Slack Incoming Webhook), JSON `{"text": "…"}`. Nur im Fehlerfall, kein „OK"-Spam.
 
 ---
 

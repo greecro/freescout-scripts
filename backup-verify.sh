@@ -97,15 +97,11 @@ log "Storage-Mirror-Statistik..."
 STATS=$(rclone size "$REMOTE_STORAGE" 2>/dev/null || echo "?")
 log "${STATS}"
 
-# ── Webhook ────────────────────────────────────────────────────────────────
-if [[ "$ERRORS" -gt 0 ]] && [[ -n "${WEBHOOK_URL:-}" ]]; then
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=down" \
-        --data-urlencode "msg=Backup-Verify hat ${ERRORS} Fehler" >/dev/null || true
-elif [[ -n "${WEBHOOK_URL:-}" ]]; then
-    curl -fsS -G "$WEBHOOK_URL" \
-        --data-urlencode "status=up" \
-        --data-urlencode "msg=Backup-Verify OK${DEEP:+ (deep)}" >/dev/null || true
+# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
+if [[ "$ERRORS" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    curl -fsS -X POST -H 'Content-type: application/json' \
+        --data "{\"text\": \"🔴 FreeScout Backup-Verify: ${ERRORS} Fehler auf ${APP_HOSTNAME}${DEEP:+ (deep)} — siehe ${LOG_FILE}\"}" \
+        "$SLACK_WEBHOOK_URL" >/dev/null || true
 fi
 
 exit $ERRORS

@@ -141,8 +141,8 @@ if [[ "$USE_OIDC" == "j" || "$USE_OIDC" == "J" ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}-- UptimeKuma (optional) --${NC}"
-read -rp "Push-Webhook-URL für Backup-/Health-Fehler (leer = aus): " WEBHOOK_URL
+echo -e "${BOLD}-- Slack-Alerts (optional) --${NC}"
+read -rp "Slack Incoming Webhook URL für Backup-/Health-Fehler (leer = aus): " SLACK_WEBHOOK_URL
 
 # ── Summary ────────────────────────────────────────────────────────────────
 echo ""
@@ -153,7 +153,7 @@ echo "  DB:            ${DB_NAME} (user: ${DB_USER})"
 echo "  R2:            ${R2_ENDPOINT}, ${R2_BUCKET}/${R2_PREFIX}"
 echo "  age:           $([[ -n "$AGE_RECIPIENT" ]] && echo "aktiv" || echo "aus")"
 echo "  OIDC-Stub:     $([[ -n "$OIDC_ISSUER" ]] && echo "${OIDC_ISSUER}" || echo "aus")"
-echo "  Webhook:       $([[ -n "$WEBHOOK_URL" ]] && echo "konfiguriert" || echo "aus")"
+echo "  Slack-Alert:   $([[ -n "$SLACK_WEBHOOK_URL" ]] && echo "konfiguriert" || echo "aus")"
 echo ""
 if ! $NON_INTERACTIVE; then
     read -rp "Installation starten? [j/N]: " confirm
@@ -412,7 +412,7 @@ DB_USER="${DB_USER}"
 INSTALL_DIR="/var/www/freescout"
 R2_BUCKET="${R2_BUCKET}"
 R2_PREFIX="${R2_PREFIX}"
-WEBHOOK_URL="${WEBHOOK_URL}"
+SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL}"
 EOF
 chmod 600 /etc/freescout/config
 
