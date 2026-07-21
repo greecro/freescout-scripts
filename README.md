@@ -64,7 +64,7 @@ Internet → Cloudflare → NPMPlus (SSL, Real-IP) → LXC FreeScout
 Auf dem Proxmox-Host als root:
 
 ```bash
-curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/proxmox-create-freescout-ct.sh
+curl -sO https://raw.githubusercontent.com/greecro/freescout-scripts/main/proxmox-create-freescout-ct.sh
 bash proxmox-create-freescout-ct.sh
 ```
 
@@ -107,7 +107,7 @@ ssh root@<lxc-ip>
 Setup-Script laden und ausführen:
 
 ```bash
-curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/setup-freescout.sh
+curl -sO https://raw.githubusercontent.com/greecro/freescout-scripts/main/setup-freescout.sh
 bash setup-freescout.sh
 ```
 
@@ -193,7 +193,7 @@ Der Web-Installer migriert das DB-Schema und legt den Admin-User an.
 **Auf dem Cloudron-Host** (als root):
 
 ```bash
-curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/migrate-from-cloudron.sh
+curl -sO https://raw.githubusercontent.com/greecro/freescout-scripts/main/migrate-from-cloudron.sh
 bash migrate-from-cloudron.sh
 ```
 
@@ -224,7 +224,7 @@ rsync -avz --progress /tmp/freescout-export-DATUM/ root@<lxc-ip>:/root/freescout
 
 ```bash
 ssh root@<lxc-ip>
-curl -sO https://raw.githubusercontent.com/djanzin/freescout-scripts/main/migrate-import.sh
+curl -sO https://raw.githubusercontent.com/greecro/freescout-scripts/main/migrate-import.sh
 bash migrate-import.sh /root/freescout-import/
 ```
 

@@ -488,7 +488,7 @@ log "UFW aktiv (22, 80, 443)."
 
 # ── Phase 15: Helper-Scripts installieren ──────────────────────────────────
 info "Phase 15/16: Helper-Scripts nach /usr/local/sbin/..."
-REPO_BASE="https://git.janzin.net/djanzin/freescout-scripts/raw/branch/main"
+REPO_BASE="https://raw.githubusercontent.com/greecro/freescout-scripts/main"
 for script in db-backup.sh storage-backup.sh backup-verify.sh update-freescout.sh restore.sh status.sh health-check.sh; do
     if [[ -f "$(dirname "$0")/${script}" ]]; then
         cp "$(dirname "$0")/${script}" "/usr/local/sbin/${script}"
