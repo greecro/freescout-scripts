@@ -22,6 +22,11 @@ LOCKFILE=/var/lock/freescout-db-backup.lock
 exec 9>"$LOCKFILE"
 flock -n 9 || { echo "Backup läuft bereits (flock)."; exit 0; }
 
+# notify() + healthchecks laden (No-Op ohne notify.sh / healthchecks.env)
+if ! source /etc/freescout/notify.sh 2>/dev/null; then notify(){ :;}; hc_start(){ :;}; hc_report(){ :;}; fi
+hc_start "${HC_URL_DB_BACKUP:-}"
+trap 'hc_report $?' EXIT
+
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR=/var/backups/freescout-db
 mkdir -p "$BACKUP_DIR"
@@ -65,11 +70,9 @@ else
     err "Remote-Sync fehlgeschlagen."
 fi
 
-# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
-if [[ "$ERRORS" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    curl -fsS -X POST -H 'Content-type: application/json' \
-        --data "{\"text\": \"🔴 FreeScout DB-Backup: ${ERRORS} Fehler auf ${APP_HOSTNAME} — siehe ${LOG_FILE}\"}" \
-        "$SLACK_WEBHOOK_URL" >/dev/null || true
+# ── Slack-Detail bei Fehler (healthchecks meldet Liveness/Fail separat) ────
+if [[ "$ERRORS" -gt 0 ]]; then
+    notify "FreeScout DB-Backup" "${ERRORS} Fehler auf ${APP_HOSTNAME} — siehe ${LOG_FILE}"
 fi
 
 exit $ERRORS

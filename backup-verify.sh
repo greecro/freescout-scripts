@@ -23,10 +23,14 @@ DEEP=false
 # shellcheck source=/dev/null
 source /etc/freescout/config
 
+# notify() + healthchecks laden (No-Op ohne notify.sh / healthchecks.env)
+if ! source /etc/freescout/notify.sh 2>/dev/null; then notify(){ :;}; hc_start(){ :;}; hc_report(){ :;}; fi
+hc_start "${HC_URL_BACKUP_VERIFY:-}"
+
 echo "==[ $(date -Iseconds) ${DEEP:+DEEP} ]==" >> "$LOG_FILE"
 
 TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
+trap 'rc=$?; rm -rf "$TMP"; hc_report $rc' EXIT
 
 REMOTE_DB="r2:${R2_BUCKET}/${R2_PREFIX}db-${APP_HOSTNAME}/"
 
@@ -68,7 +72,7 @@ fi
 
 # ── SQL-Header-Check ───────────────────────────────────────────────────────
 log "SQL-Header-Check..."
-HEADER=$(zcat "$DUMP" 2>/dev/null | head -5)
+HEADER=$(zcat "$DUMP" 2>/dev/null | head -5 || true)
 if echo "$HEADER" | grep -q "MySQL\|MariaDB\|CREATE\|INSERT"; then
     log "SQL-Header OK."
 else
@@ -97,11 +101,9 @@ log "Storage-Mirror-Statistik..."
 STATS=$(rclone size "$REMOTE_STORAGE" 2>/dev/null || echo "?")
 log "${STATS}"
 
-# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
-if [[ "$ERRORS" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    curl -fsS -X POST -H 'Content-type: application/json' \
-        --data "{\"text\": \"🔴 FreeScout Backup-Verify: ${ERRORS} Fehler auf ${APP_HOSTNAME}${DEEP:+ (deep)} — siehe ${LOG_FILE}\"}" \
-        "$SLACK_WEBHOOK_URL" >/dev/null || true
+# ── Slack-Detail bei Fehler (healthchecks meldet Liveness/Fail separat) ────
+if [[ "$ERRORS" -gt 0 ]]; then
+    notify "FreeScout Backup-Verify" "${ERRORS} Fehler auf ${APP_HOSTNAME}${DEEP:+ (deep)} — siehe ${LOG_FILE}"
 fi
 
 exit $ERRORS

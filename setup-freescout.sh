@@ -371,8 +371,12 @@ log "Supervisor konfiguriert (Worker autostart=false — nach Web-Install starte
 # ── Phase 8: Cron ──────────────────────────────────────────────────────────
 info "Phase 8/16: Cron (FreeScout-Scheduler)..."
 crontab -u www-data -l 2>/dev/null > /tmp/cron.www-data || true
+# schedule:run pingt bei Erfolg healthchecks (Dead-Man's-Switch für den Scheduler).
+# Ping-URL in /etc/freescout-scheduler-hc-url (640 root:www-data — außerhalb des
+# 700-Verzeichnisses /etc/freescout, damit www-data sie lesen kann). Fehlt die
+# Datei, ist der Ping ein No-Op; der Scheduler läuft unverändert weiter.
 grep -q "artisan schedule:run" /tmp/cron.www-data || \
-    echo "* * * * * /usr/bin/php /var/www/freescout/artisan schedule:run >/dev/null 2>&1" >> /tmp/cron.www-data
+    echo "* * * * * /usr/bin/php /var/www/freescout/artisan schedule:run >/dev/null 2>&1 && curl -fsS -m 10 \"\$(cat /etc/freescout-scheduler-hc-url 2>/dev/null)\" >/dev/null 2>&1" >> /tmp/cron.www-data
 crontab -u www-data /tmp/cron.www-data
 rm -f /tmp/cron.www-data
 log "Cron für www-data eingerichtet."
@@ -497,6 +501,14 @@ for script in db-backup.sh storage-backup.sh backup-verify.sh update-freescout.s
     fi
     chmod +x "/usr/local/sbin/${script}" 2>/dev/null || true
 done
+
+# notify.sh (Slack + healthchecks-Helper) nach /etc/freescout/ (wird von den Scripts gesourct)
+if [[ -f "$(dirname "$0")/notify.sh" ]]; then
+    cp "$(dirname "$0")/notify.sh" /etc/freescout/notify.sh
+else
+    curl -fsSL "${REPO_BASE}/notify.sh" -o /etc/freescout/notify.sh 2>/dev/null || true
+fi
+chmod 644 /etc/freescout/notify.sh 2>/dev/null || true
 
 # Backup-Crons (root)
 # Kein flock im Cron-Aufruf: db-backup.sh/storage-backup.sh nehmen intern selbst

@@ -15,6 +15,9 @@ ERRORS=()
 source /etc/freescout/config
 DB_PASS=$(grep '^DB_PASS=' /etc/freescout/db-credentials.txt | cut -d= -f2-)
 
+# notify() laden (No-Op ohne /etc/freescout/notify.sh)
+if ! source /etc/freescout/notify.sh 2>/dev/null; then notify(){ :;}; fi
+
 LXC_IP=$(hostname -I | awk '{print $1}')
 
 # ── HTTP ───────────────────────────────────────────────────────────────────
@@ -56,13 +59,9 @@ if [[ "$FAILED" -gt 0 ]]; then
     warn "Failed Jobs in DB: ${FAILED} (Manage → System → Logs prüfen)"
 fi
 
-# ── Slack-Alert bei Fehler ─────────────────────────────────────────────────
-if [[ "${#ERRORS[@]}" -gt 0 ]] && [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    # Fehlertexte JSON-safe machen (Quotes/Newlines raus)
-    MSG="$(IFS='; '; echo "${ERRORS[*]}" | tr '\n' ' ' | sed 's/"/'"'"'/g')"
-    curl -fsS -X POST -H 'Content-type: application/json' \
-        --data "{\"text\": \"🔴 FreeScout Health-Check auf ${APP_HOSTNAME:-?}: ${MSG}\"}" \
-        "$SLACK_WEBHOOK_URL" >/dev/null || true
+# ── Slack-Detail bei Fehler ────────────────────────────────────────────────
+if [[ "${#ERRORS[@]}" -gt 0 ]]; then
+    notify "FreeScout Health-Check" "$(IFS='; '; echo "${ERRORS[*]}")"
 fi
 
 exit "${#ERRORS[@]}"
