@@ -21,6 +21,10 @@ Gemeinsame Instruktionsdatei für alle Agenten (Claude, Codex, Gemini);
 4. **`health-check.sh` läuft bewusst nicht im Cron** (Dany-Entscheidung), nur manuell.
 5. **Reverse Proxy ist Caddy**, nicht NPM+ — der README-Abschnitt ist historisch.
 6. **Queue-Worker nach jedem Update prüfen** (`supervisorctl`); ein stiller Worker sieht wie ein
-   funktionierender Helpdesk aus, bis Mails liegen bleiben.
+   funktionierender Helpdesk aus, bis Mails liegen bleiben. `supervisorctl start` allein reicht
+   **nicht** — das Setup legt den Worker mit `autostart=false` an, ein bloßes `start` überlebt
+   also keinen Reboot (real: stand so von Mai bis August). Immer `autostart=true` setzen,
+   `reread`+`update`, dann auf `RUNNING` prüfen. Fällt nicht auf, weil FreeScouts Scheduler
+   selbst ein `queue:work` startet und die Queue trotzdem leerläuft.
 7. **Migration ist einmalig und destruktiv am Ziel.** `migrate-from-cloudron.sh` /
    `migrate-import.sh` nie gegen die laufende Instanz ohne Danys Ansage.
