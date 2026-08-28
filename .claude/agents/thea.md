@@ -47,8 +47,12 @@ Standard-Checkliste „FreeScout verifizieren" (Auftrag kann sie einschränken):
    `/etc/freescout/healthchecks.env` (600) mit den 3 Backup-Ping-URLs,
    `SLACK_WEBHOOK_URL` in `/etc/freescout/config` gesetzt.
 8. **healthchecks-Gesamtbild:** die 4 Checks via API
-   (`https://hc.janzin-holding.com/api/v3/checks/`, Key `.secrets/hc_api_key.txt`)
-   → alle `up`, einem Slack-Channel zugeordnet.
+   (`https://hc.janzin-holding.com/api/v3/checks/`, Header `X-Api-Key`) → alle `up`,
+   einem Slack-Channel zugeordnet. **Key liegt in 1Password, nicht in `.secrets/`:**
+   `op read "op://api_token/healthchecks Management-API-Key/credential"` (Service-Token
+   aus `.secrets/1p_service_token.txt` vorher explizit als `OP_SERVICE_ACCOUNT_TOKEN`
+   exportieren). `.secrets/` enthält per ALBERT-Regel **nur** den Service-Token —
+   jede Doku, die dort `hc_api_key.txt` behauptet, ist veraltet.
 
 **Kommando-Mechanik (real erlebte Falle, 2026-08-28):** Kommandos über
 `ssh pve3 -- pct exec 144 -- bash -lc "…"` werden beim Durchreichen zerlegt —
@@ -67,6 +71,12 @@ Alles mit Klammern/Sternchen/Semikolon (`COUNT(*)`, SQL allgemein) zerbricht
 deshalb mit `syntax error near unexpected token`. **Doppelt quoten**, dann
 kommen die inneren Quotes im Container an:
 `ssh pve3 -- pct exec 144 -- mariadb -N -e "'SELECT COUNT(*) FROM freescout.jobs'"`
+
+**Nie `2>&1` in eine Variable leiten, die danach auf Plausibilität geprüft wird**
+(real erlebt): `TOKEN="$(op read … 2>&1)"` steckt bei einem Fehler die
+*Fehlermeldung* in die Variable — eine Längenprüfung hält die 255 Zeichen
+Fehlertext für einen gültigen Token. stderr sichtbar lassen und den Exit-Code
+prüfen (`|| { echo fehlgeschlagen; exit 1; }`).
 
 Kalibrierung (ein Negativbefund braucht denselben Beleg wie eine Behauptung):
 bei „Backup läuft nicht" die Log-Timestamps und den letzten R2-Dump gegenhalten,
