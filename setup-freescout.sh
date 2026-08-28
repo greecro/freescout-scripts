@@ -366,7 +366,7 @@ EOF
 systemctl enable --now supervisor >/dev/null
 supervisorctl reread >/dev/null
 supervisorctl update >/dev/null
-log "Supervisor konfiguriert (Worker autostart=false — nach Web-Install starten)."
+log "Supervisor konfiguriert (Worker autostart=false — nach Web-Install auf true setzen, s. Schluss-Hinweis)."
 
 # ── Phase 8: Cron ──────────────────────────────────────────────────────────
 info "Phase 8/16: Cron (FreeScout-Scheduler)..."
@@ -548,8 +548,11 @@ echo "  DB-User:  ${DB_USER}"
 echo "  DB-Pass:  ${DB_PASS}"
 echo "  (auch in /etc/freescout/db-credentials.txt)"
 echo ""
-echo -e "${BOLD}Nach Web-Install:${NC}"
-echo "  supervisorctl start freescout-worker:*"
+echo -e "${BOLD}Nach Web-Install (Queue-Worker dauerhaft aktivieren):${NC}"
+echo "  sed -i 's/^autostart=false$/autostart=true/' /etc/supervisor/conf.d/freescout-worker.conf"
+echo "  supervisorctl reread && supervisorctl update"
+echo "  supervisorctl status freescout-worker:*   # muss RUNNING zeigen"
+echo "  (nur 'supervisorctl start' überlebt keinen Reboot — autostart bliebe false)"
 echo ""
 echo -e "${BOLD}Migration aus Cloudron:${NC}"
 echo "  → migrate-import.sh /root/freescout-import/"
