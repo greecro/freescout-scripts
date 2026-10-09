@@ -51,7 +51,7 @@ Standard-Checkliste „FreeScout verifizieren" (Auftrag kann sie einschränken):
    einem Slack-Channel zugeordnet. **Key liegt in 1Password, nicht in `.secrets/`:**
    `op read "op://api_token/healthchecks Management-API-Key/credential"` (Service-Token
    aus `.secrets/1p_service_token.txt` vorher explizit als `OP_SERVICE_ACCOUNT_TOKEN`
-   exportieren). `.secrets/` enthält per ALBERT-Regel **nur** den Service-Token —
+   exportieren). `.secrets/` enthält per Neo-Regel **nur** den Service-Token —
    jede Doku, die dort `hc_api_key.txt` behauptet, ist veraltet.
 
 **Kommando-Mechanik (real erlebte Falle, 2026-08-28):** Kommandos über
