@@ -6,7 +6,7 @@ Gemeinsame Instruktionsdatei für alle Agenten (Claude, Codex, Gemini);
 
 - Schritt-für-Schritt, Backup-Konzept, Script-Übersicht: [README.md](README.md)
 - Gast-ID, IP, VLAN: `~/Developer/KI/projects/proxmox-cluster/inventory.md`
-- OIDC-Anbindung: Dossier `project_freescout_oidc.md`, Blueprint in `homelab-authentik`
+- OIDC-Anbindung: Wiki-Seite `project-freescout-oidc`, Blueprint in `homelab-authentik`
 
 ## Projektregeln
 
