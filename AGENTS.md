@@ -5,7 +5,7 @@ Gemeinsame Instruktionsdatei für alle Agenten (Claude, Codex, Gemini);
 `CLAUDE.md` ist ein Symlink hierauf. Remote liegt in der `greecro`-Org.
 
 - Schritt-für-Schritt, Backup-Konzept, Script-Übersicht: [README.md](README.md)
-- Gast-ID, IP, VLAN: `~/Developer/KI/projects/proxmox-cluster/inventory.md`
+- Gast-ID, IP, VLAN: `~/Developer/KI/projects/privat/proxmox-cluster/inventory.md`
 - OIDC-Anbindung: Wiki-Seite `project-freescout-oidc`, Blueprint in `homelab-authentik`
 
 ## Projektregeln
