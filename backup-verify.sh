@@ -83,9 +83,10 @@ fi
 if $DEEP; then
     log "DEEP: Test-Restore in temporäre DB..."
     TEST_DB="${DB_NAME}_verify_$$"
-    DB_PASS=$(grep '^DB_PASS=' /etc/freescout/db-credentials.txt | cut -d= -f2-)
+    # Import als root ueber den Unix-Socket wie CREATE/DROP: der App-User hat nur Rechte auf
+    # seine eigene DB, nicht auf ${TEST_DB} (ERROR 1044, Deep-Test lief deshalb nie durch).
     mariadb -e "CREATE DATABASE \`${TEST_DB}\`;"
-    if zcat "$DUMP" | mariadb -u"${DB_USER}" -p"${DB_PASS}" "${TEST_DB}" 2>>"$LOG_FILE"; then
+    if zcat "$DUMP" | mariadb "${TEST_DB}" 2>>"$LOG_FILE"; then
         TABLES=$(mariadb -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${TEST_DB}';")
         log "Test-Restore OK: ${TABLES} Tabellen."
         mariadb -e "DROP DATABASE \`${TEST_DB}\`;"
