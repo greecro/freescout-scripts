@@ -385,6 +385,8 @@ log "Cron für www-data eingerichtet."
 info "Phase 9/16: rclone (R2)..."
 apt-get install -y -qq rclone >/dev/null
 mkdir -p /root/.config/rclone
+# no_head = true: rclone 1.60 fragt nach jedem Upload per HEAD nach, R2 antwortet darauf mit
+# 501 NotImplemented, der erste Versuch scheiterte bei jedem Lauf (belegt 2026-11-16).
 cat > /root/.config/rclone/rclone.conf <<EOF
 [r2]
 type = s3
@@ -393,6 +395,7 @@ access_key_id = ${R2_ACCESS_KEY}
 secret_access_key = ${R2_SECRET_KEY}
 endpoint = ${R2_ENDPOINT}
 acl = private
+no_head = true
 EOF
 chmod 600 /root/.config/rclone/rclone.conf
 # Test
